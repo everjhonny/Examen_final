@@ -7,9 +7,10 @@ import numpy as np
 from sklearn.model_selection import cross_val_score
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import confusion_matrix
+from sklearn.model_selection import train_test_split
 
 #Cuando cada equipo no tiene calificación de elo, dale una calificación de elo básica
-base_elo = 1600
+#base_elo = 1600
 team_elos = {}
 team_stats = {}
 X = []
@@ -85,9 +86,9 @@ def  build_dataSet(all_data):
         if row['resultado'] == 'vv':#victoria de visitante
             ganador = row['visitante']
             perdedor = row['local']
-        if row['resultado'] == 'e':#empate
-            ganador = row['visitante']
-            perdedor = row['local']   
+        #if row['resultado'] == 'e':#empate
+            #ganador = row['visitante']
+            #perdedor = row['local']   
         #Obtener el valor de elo inicial de cada equipo
         team1_elo = get_elo(ganador)
         team2_elo = get_elo(perdedor)
@@ -106,8 +107,7 @@ def  build_dataSet(all_data):
         for key, value in team_stats.loc[perdedor].iteritems():
             team2_features.append(value)
 
-       # Asignar aleatoriamente los valores propios de los dos equipos a los lados izquierdo y derecho de los datos para cada juego
-       # Y asigne el 0/1 correspondiente al valor y
+      
         if random.random() > 0.5:
             X.append(team1_features + team2_features)
             y.append(0)
@@ -121,6 +121,8 @@ def  build_dataSet(all_data):
         team_elos[ganador] = new_winner_rank
         team_elos[perdedor] = new_loser_rank
 
+    print(np.nan_to_num(X))
+    print(np.array(y))
     return np.nan_to_num(X), np.array(y)
 
 def predict_winner(team_1, team_2, model):
@@ -133,9 +135,6 @@ def predict_winner(team_1, team_2, model):
     features.append(get_elo(team_2))
     for key, value in team_stats.loc[team_1].iteritems():
         features.append(value)
-
-    # equipo 2, el equipo local
-    
 
     features = np.nan_to_num(features)
     return model.predict_proba([features])
@@ -151,18 +150,22 @@ if __name__ == '__main__':
     result_data = pd.read_csv(folder + '/resultados_temp_2020.csv')
     
     X, y = build_dataSet(result_data)
-
-    # Entrena el modelo de red
+ 
+    X_train, X_test,y_train,y_test=train_test_split(X,y,train_size=0.8,test_size=0.2,random_state=0)
+    # Entrena el modelo
     print("probando en %d muestras de juego.." % len(X))
 
    
-    model = LogisticRegression(solver='lbfgs',class_weight='balanced', max_iter=10000)
-    model.fit(X, y)
-        
-    # validación cruzada de 10 veces para calcular la precisión del entrenamiento
+    model = LogisticRegression(multi_class='multinomial',solver='lbfgs',class_weight='balanced', max_iter=10000)
+    model.fit(X_train, y_train)
+   # m=model.predict(y_train) 
+    #print("------",m)
+    
+    # validación cruzada  para calcular la precisión del entrenamiento
     print("armando validacion cruzada...")
-    print(cross_val_score(model, X, y, cv = 26, scoring='accuracy', n_jobs=-1).mean())
-    print("matriz",confusion_matrix(y,))
+    print(cross_val_score(model, X_train, y_train, cv = 26, scoring='accuracy', n_jobs=-1))
+    print("media:",cross_val_score(model, X, y, cv = 26, scoring='accuracy', n_jobs=-1).mean())
+    #print("matriz",confusion_matrix(y_train,y))
     
     #Utilizando el modelo entrenado para hacer predicciones
     print('Predecir resultados de los nuevos cruces..')
@@ -174,11 +177,11 @@ if __name__ == '__main__':
         pred = predict_winner(team1, team2, model)
         prob = pred[0][0]
       
-        if prob==0.5:
-            winner = team1
-            loser = team2
-            tv='em'
-            result.append([winner, loser, prob,tv])
+        #if prob==0.5:
+           # winner = team1
+            #loser = team2
+            #tv='em'
+            #result.append([winner, loser, prob,tv])
             
         if prob > 0.5:
             winner = team1
@@ -190,16 +193,13 @@ if __name__ == '__main__':
             loser = team1
             tv='vv'
             result.append([winner, loser, 1 - prob,tv])
-
+   # 
     with open('Result.csv', 'a') as f:
         writer = csv.writer(f)
         writer.writerows(['g', 'p', 'pb','resul'])        
         writer.writerows(result)
 
 print(result)
-
-
-
 
 
 
